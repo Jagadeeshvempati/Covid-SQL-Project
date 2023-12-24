@@ -2,7 +2,6 @@ Here is a brief description of each section:
 
 Data Retrieval:
 The initial queries retrieve data from tables named CovidDeaths and CovidVaccinations in the portfolioproject database.
-The data is ordered based on columns 3 and 4 (presumably date-related columns).
 
 Analysis of COVID-19 Cases and Deaths:
 Subsequent queries focus on analyzing the COVID-19 data, calculating death percentages, infection percentages, and identifying countries with the highest infection rates and death counts.
@@ -20,4 +19,4 @@ A view (PercentPopulationVaccinated) is created for later visualizations, joinin
 View Query:
 The final query selects data from the created view (PercentPopulationVaccinated).
 
-In summary, this SQL code performs a comprehensive analysis of COVID-19 data, covering aspects like cases, deaths, vaccination rates, and creating temporary structures for data storage and later visualization.
+In summary, this SQL code performs a comprehensive analysis of COVID-19 data, covering aspects like cases, deaths, vaccination rates, and creating temporary structures for data storage.
