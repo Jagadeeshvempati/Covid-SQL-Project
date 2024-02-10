@@ -1,3 +1,4 @@
+
 Select *
 From portfolioproject..CovidDeaths
 --where continent is not null
@@ -74,34 +75,48 @@ order by 1,2
 
 
 --Looking at Total Population vs Vaccinations
-Select dae.continent, dae.location, dae.date, dae.population, vac.new_vaccinations
-, SUM(cast(vac.new_vaccinations as int)) over (Partition by dae.location order by dae.location, dea.date) as RollingpeopleVaccinated
---, (RollingpeopleVaccinated/population)*100
-From portfolioproject..CovidDeaths dea
-Join portfolioproject..CovidVaccinations vac 
-	on dae.location = vac.location 
-	and dae.date= vac.date
-where dae.continent is not null
-order by 2,3
+SELECT
+    dae.continent,
+    dae.location,
+    dae.date,
+    dae.population,
+    vac.new_vaccinations,
+    SUM(CAST(vac.new_vaccinations AS INT)) OVER (PARTITION BY dae.location ORDER BY dae.location, dae.date) AS RollingpeopleVaccinated,
+    (SUM(CAST(vac.new_vaccinations AS INT)) OVER (PARTITION BY dae.location ORDER BY dae.location, dae.date) / dae.population) * 100 AS VaccinationPercentage
+FROM
+    portfolioproject..CovidDeaths dae
+JOIN
+    portfolioproject..CovidVaccinations vac ON dae.location = vac.location AND dae.date = vac.date
+WHERE
+    dae.continent IS NOT NULL
+ORDER BY
+    dae.location, dae.date;
+
 
 
 --USE CTE
 
-With PopvsVac (Continent, Location, Date, Population, New_vaccinations, RollingpeopleVaccinated) 
-as 
+WITH PopvsVac (Continent, Location, Date, Population, New_vaccinations, RollingpeopleVaccinated) AS
 (
-Select dae.continent, dae.location, dae.date, dae.population, vac.New_vaccinations
-, SUM(cast(vac.new_vaccinations as int)) over (Partition by dae.location order by dae.location, dea.date) as RollingpeopleVaccinated
---, (RollingpeopleVaccinated/population)*100
-From portfolioproject..CovidDeaths dea
-Join portfolioproject..CovidVaccinations vac 
-	on dae.location = vac.location 
-	and dae.date= vac.date
-where dae.continent is not null
---order by 2,3
+    SELECT
+        dae.continent,
+        dae.location,
+        dae.date,
+        dae.population,
+        vac.New_vaccinations,
+        SUM(CAST(vac.new_vaccinations AS INT)) OVER (PARTITION BY dae.location ORDER BY dae.location, dae.date) AS RollingpeopleVaccinated
+    FROM
+        portfolioproject..CovidDeaths dae
+    JOIN
+        portfolioproject..CovidVaccinations vac ON dae.location = vac.location AND dae.date = vac.date
+    WHERE
+        dae.continent IS NOT NULL
 )
-Select *, (RollingpeopleVaccinated/population)*100 
-from PopvsVac
+SELECT
+    *,
+    (RollingpeopleVaccinated / NULLIF(Population, 0)) * 100 AS VaccinationPercentage
+FROM
+    PopvsVac;
 
 
 
@@ -116,34 +131,67 @@ Population numeric,
 New_vaccinations numeric,
 RollingpeopleVaccinated numeric
 )
+-- Create a temporary table to hold the data
+CREATE TABLE #PercentPeopleVaccinated (
+    Continent NVARCHAR(MAX),
+    Location NVARCHAR(MAX),
+    Date DATE,
+    Population INT,
+    New_vaccinations INT,
+    RollingpeopleVaccinated INT
+);
 
-Insert into #PercentPeopleVaccinated
-Select dae.continent, dae.location, dae.date, dae.population, vac.New_vaccinations
-, SUM(cast(vac.new_vaccinations as int)) over (Partition by dae.location order by dae.location, dea.date) as RollingpeopleVaccinated
---, (RollingpeopleVaccinated/population)*100
-From portfolioproject..CovidDeaths dea
-Join portfolioproject..CovidVaccinations vac 
-	on dae.location = vac.location 
-	and dae.date= vac.date
-where dae.continent is not null
---order by 2,3
+-- Insert data into the temporary table
+INSERT INTO #PercentPeopleVaccinated (Continent, Location, Date, Population, New_vaccinations, RollingpeopleVaccinated)
+SELECT
+    dae.continent,
+    dae.location,
+    dae.date,
+    dae.population,
+    vac.New_vaccinations,
+    SUM(CAST(vac.new_vaccinations AS INT)) OVER (PARTITION BY dae.location ORDER BY dae.location, dae.date) AS RollingpeopleVaccinated
+FROM
+    portfolioproject..CovidDeaths dae
+JOIN
+    portfolioproject..CovidVaccinations vac ON dae.location = vac.location AND dae.date = vac.date
+WHERE
+    dae.continent IS NOT NULL;
 
-Select *, (RollingpeopleVaccinated/population)*100
-from #PercentPeopleVaccinated
+-- Select data from the temporary table with vaccination percentage calculation
+SELECT
+    *,
+    CASE
+        WHEN Population = 0 THEN NULL  -- Avoid division by zero error
+        ELSE (RollingpeopleVaccinated * 1.0 / Population) * 100
+    END AS VaccinationPercentage
+FROM
+    #PercentPeopleVaccinated;
+
+-- Drop the temporary table
+DROP TABLE #PercentPeopleVaccinated;
+
 
 
 --Creating View to store data for later Visualizations
-Create View PercentPopulationVaccinated as 
-Select dae.continent, dae.location, dae.date, dae.population, vac.New_vaccinations
-, SUM(cast(vac.new_vaccinations as int)) over (Partition by dae.location order by dae.location, dea.date) as RollingpeopleVaccinated
---, (RollingpeopleVaccinated/population)*100
-From portfolioproject..CovidDeaths dea
-Join portfolioproject..CovidVaccinations vac 
-	on dae.location = vac.location 
-	and dae.date= vac.date
-where dae.continent is not null
---order by 2,3
+CREATE VIEW PercentPopulationVaccinated AS
+SELECT
+    dae.continent,
+    dae.location,
+    dae.date,
+    dae.population,
+    vac.New_vaccinations,
+    SUM(CAST(vac.New_vaccinations AS INT)) OVER (PARTITION BY dae.location ORDER BY dae.location, dae.date) AS RollingpeopleVaccinated,
+    CASE
+        WHEN dae.population = 0 THEN NULL
+        ELSE (SUM(CAST(vac.New_vaccinations AS INT)) OVER (PARTITION BY dae.location ORDER BY dae.location, dae.date) * 1.0 / dae.population) * 100
+    END AS VaccinationPercentage
+FROM
+    portfolioproject..CovidDeaths dae
+JOIN
+    portfolioproject..CovidVaccinations vac ON dae.location = vac.location AND dae.date = vac.date
+WHERE
+    dae.continent IS NOT NULL;
 
-
-Select *
-from PercentPopulationVaccinated
+-- Now, to retrieve data from the view
+SELECT *
+FROM PercentPopulationVaccinated;
